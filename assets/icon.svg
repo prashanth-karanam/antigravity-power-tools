@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="iconPrimaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#f472b6" />
+    </linearGradient>
+
+    <linearGradient id="iconShieldBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#181d28" />
+      <stop offset="100%" stop-color="#0b0e14" />
+    </linearGradient>
+
+    <radialGradient id="iconGlow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.25" />
+      <stop offset="70%" stop-color="#f472b6" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#090b10" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="iconBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Container Base -->
+  <rect width="256" height="256" rx="56" fill="#090b10" stroke="rgba(255,255,255,0.08)" stroke-width="2" />
+  <rect width="256" height="256" rx="56" fill="url(#iconGlow)" />
+
+  <!-- Outer Hex Shield -->
+  <g transform="translate(38, 38)">
+    <polygon points="90,10 160,45 160,135 90,170 20,135 20,45" fill="none" stroke="url(#iconPrimaryGrad)" stroke-width="4" filter="url(#iconBlur)" opacity="0.5" />
+    <polygon points="90,10 160,45 160,135 90,170 20,135 20,45" fill="url(#iconShieldBg)" stroke="url(#iconPrimaryGrad)" stroke-width="2.5" />
+
+    <!-- Orbital Telemetry Arcs -->
+    <path d="M 40,30 A 75,75 0 0,1 140,30" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="10 8" opacity="0.7" />
+    <path d="M 145,145 A 75,75 0 0,1 35,145" fill="none" stroke="#f472b6" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="10 8" opacity="0.7" />
+
+    <!-- Orbit Micro Nodes -->
+    <circle cx="140" cy="30" r="4" fill="#38bdf8" />
+    <circle cx="35" cy="145" r="4" fill="#f472b6" />
+
+    <!-- Chevron Crown -->
+    <path d="M 52,62 L 90,38 L 128,62" fill="none" stroke="#f8fafc" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    
+    <!-- Power Bolt -->
+    <path d="M 96,48 L 74,96 L 96,96 L 82,142 L 118,84 L 96,84 Z" fill="url(#iconPrimaryGrad)" stroke="#f8fafc" stroke-width="1.8" stroke-linejoin="round" />
+  </g>
+</svg>

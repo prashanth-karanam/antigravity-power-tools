@@ -1,0 +1,23 @@
+{
+  "name": "antigravity-power-tools",
+  "version": "4.0.0",
+  "description": "High-Rigor Cognitive Engines, Runtime CDP Injection & Live Quota Telemetry for Google Antigravity",
+  "main": "bin/power_daemon.js",
+  "scripts": {
+    "start": "node bin/power_daemon.js",
+    "install-service": "powershell -ExecutionPolicy Bypass -File install.ps1",
+    "uninstall-service": "powershell -ExecutionPolicy Bypass -File uninstall.ps1"
+  },
+  "keywords": [
+    "antigravity",
+    "google-antigravity",
+    "developer-tools",
+    "llm-telemetry",
+    "cdp-injection",
+    "cognitive-architectures",
+    "powertoys",
+    "gemini"
+  ],
+  "author": "prashanth-karanam",
+  "license": "MIT"
+}
