@@ -371,24 +371,36 @@ function getTokenStats(convId) {
           const uLines = uText.split('\n').length;
           totalLinesConvo += uLines;
 
-          if (currentTurn) turns.push(currentTurn);
           const rawClean = uText.replace(/<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>[\s\S]*/, '$1')
                                 .replace(/<[^>]+>/g, '')
                                 .trim();
-          currentTurn = {
-            turnIndex: turns.length + 1,
-            stepIndex: step.step_index,
-            promptSnippet: rawClean.slice(0, 45) || 'User Request',
-            fullPrompt: rawClean,
-            userLines: uLines,
-            timestamp: step.created_at,
-            inputTokens: 0,
-            cacheReadTokens: 0,
-            outputTokens: 0,
-            steps: 0,
-            assistantLines: 0,
-            engineKey: 'stock_architect'
-          };
+
+          const existingTurn = (currentTurn && currentTurn.stepIndex === step.step_index)
+            ? currentTurn
+            : turns.find(t => t.stepIndex === step.step_index);
+
+          if (existingTurn) {
+            existingTurn.promptSnippet = rawClean.slice(0, 45) || 'User Request';
+            existingTurn.fullPrompt = rawClean;
+            existingTurn.userLines = uLines;
+            existingTurn.timestamp = step.created_at;
+          } else {
+            if (currentTurn) turns.push(currentTurn);
+            currentTurn = {
+              turnIndex: turns.length + 1,
+              stepIndex: step.step_index,
+              promptSnippet: rawClean.slice(0, 45) || 'User Request',
+              fullPrompt: rawClean,
+              userLines: uLines,
+              timestamp: step.created_at,
+              inputTokens: 0,
+              cacheReadTokens: 0,
+              outputTokens: 0,
+              steps: 0,
+              assistantLines: 0,
+              engineKey: 'stock_architect'
+            };
+          }
         } else if (currentTurn) {
           currentTurn.steps++;
           if (step.input_tokens !== undefined) currentTurn.inputTokens = Math.max(currentTurn.inputTokens, step.input_tokens);
@@ -419,6 +431,7 @@ function getTokenStats(convId) {
       } catch (e) {}
     }
     if (currentTurn) turns.push(currentTurn);
+    turns.forEach((t, i) => { t.turnIndex = i + 1; });
 
     const currentContext = latestInput + latestCacheRead;
     const cacheRate = currentContext > 0 ? ((latestCacheRead / currentContext) * 100).toFixed(1) : '0.0';
@@ -458,9 +471,13 @@ function getTokenStats(convId) {
       recentTurns: turns.slice(-6).reverse(),
       allTurns: turns.map(t => ({
         turnIndex: t.turnIndex,
+        stepIndex: t.stepIndex,
         promptSnippet: t.promptSnippet,
         cleanPrompt: (t.fullPrompt || t.promptSnippet).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40),
-        engineKey: t.engineKey || 'stock_architect'
+        engineKey: t.engineKey || 'stock_architect',
+        contextTokens: (t.inputTokens || 0) + (t.cacheReadTokens || 0),
+        outputTokens: t.outputTokens || 0,
+        timestamp: t.timestamp
       }))
     };
   } catch (err) {

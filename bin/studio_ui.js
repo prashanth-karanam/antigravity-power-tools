@@ -247,6 +247,7 @@
     recentTurns: [],
     allTurns: []
   };
+  window.__agTokenStats = tokenStats;
 
   let aggyQuota = {
     gemini5hRemaining: '--',
@@ -1228,6 +1229,24 @@
     updateTelemetryDisplay();
   }
 
+  window.__agOpenStudioModal = function(tabName = 'tools') {
+    ensurePopovers();
+    const modal = document.getElementById('antigravity-tune-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    updateModalUI();
+    fetchDaemonState();
+    if (tabName) {
+      const btn = modal.querySelector(`.ag-tab-btn[data-tab="${tabName}"]`);
+      if (btn) btn.click();
+    }
+  };
+
+  window.__agCloseModal = function() {
+    const modal = document.getElementById('antigravity-tune-modal');
+    if (modal) modal.style.display = 'none';
+  };
+
   // --- MOUNTING: SIDEBAR BUTTON (NATIVE INTEGRATION) ---
   window.__agEnsureTuneButton = function() {
     // Look for Automations and Customizations in sidebar
@@ -1261,10 +1280,10 @@
         e.preventDefault();
         e.stopPropagation();
         const modal = document.getElementById('antigravity-tune-modal');
-        if (modal) {
-          modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
-          updateModalUI();
-          fetchDaemonState();
+        if (modal && modal.style.display === 'flex') {
+          window.__agCloseModal();
+        } else {
+          window.__agOpenStudioModal('tools');
         }
       };
 
@@ -1274,10 +1293,10 @@
         e.preventDefault();
         e.stopPropagation();
         const modal = document.getElementById('antigravity-tune-modal');
-        if (modal) {
-          modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
-          updateModalUI();
-          fetchDaemonState();
+        if (modal && modal.style.display === 'flex') {
+          window.__agCloseModal();
+        } else {
+          window.__agOpenStudioModal('tools');
         }
       };
       if (tuneBtn.nextElementSibling !== custLink && autoBtn.parentNode) {
@@ -1361,10 +1380,32 @@
   };
 
   // --- TRANSCRIPT TURN CHIPS (THE TURN SHOWER) ---
+  function getReactStepIndex(node) {
+    try {
+      const fiberKey = Object.keys(node).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+      if (!fiberKey) return null;
+      let f = node[fiberKey];
+      for (let i = 0; i < 25 && f; i++) {
+        if (f.memoizedProps) {
+          if (typeof f.memoizedProps.userStepIndex === 'number') {
+            return f.memoizedProps.userStepIndex;
+          }
+          if (f.memoizedProps.step && typeof f.memoizedProps.step.step_index === 'number') {
+            return f.memoizedProps.step.step_index;
+          }
+        }
+        f = f.return;
+      }
+    } catch(e) {}
+    return null;
+  }
+
   window.__agEnsureChatTurnChips = function() {
     const userNodes = document.querySelectorAll('[data-testid="user-input-step"], [data-testid*="user-message"], .user-message');
     const activeEngKey = getActiveEngineForCurrentChat();
     const activeEng = ENGINES[activeEngKey] || ENGINES['stock_architect'];
+
+    let lastAssignedTurn = 0;
 
     userNodes.forEach((node, idx) => {
       let chip = node.querySelector('.ag-turn-chip');
@@ -1374,18 +1415,74 @@
         const cardBorder = node.querySelector('.bg-card-border') || node;
         cardBorder.parentNode.insertBefore(chip, cardBorder.nextSibling);
       }
-      chip.style.cssText = `display:inline-flex;align-items:center;gap:6px;font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.03);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);margin-top:6px;margin-bottom:2px;width:fit-content;line-height:14px;letter-spacing:0.1px;user-select:none;`;
+      chip.style.cssText = `display:inline-flex;align-items:center;gap:6px;font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.03);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);margin-top:6px;margin-bottom:2px;width:fit-content;line-height:14px;letter-spacing:0.1px;user-select:none;cursor:pointer;transition:border-color 0.15s, background 0.15s;`;
       
-      const turnNum = (tokenStats.totalTurns || (idx + 1));
-      const ctxStr = tokenStats.currentContext ? `${(tokenStats.currentContext / 1000).toFixed(0)}k` : '';
+      const stepIdx = getReactStepIndex(node);
+      const textEl = node.querySelector('.whitespace-pre-wrap') || node.querySelector('[data-quotable="true"]') || node;
+      const cleanText = (textEl ? textEl.innerText || textEl.textContent : '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40);
+
+      let matched = null;
+      if (tokenStats.allTurns && tokenStats.allTurns.length > 0) {
+        // Priority 1: Match by exact stepIndex from React Fiber
+        if (stepIdx !== null) {
+          matched = tokenStats.allTurns.find(t => t.stepIndex === stepIdx);
+        }
+        // Priority 2: Match by clean text snippet (preferring turns chronologically after lastAssignedTurn)
+        if (!matched && cleanText) {
+          matched = tokenStats.allTurns.find(t => {
+            if (!t.cleanPrompt || t.turnIndex <= lastAssignedTurn) return false;
+            const needle = t.cleanPrompt.slice(0, 15);
+            return cleanText.includes(needle) || t.cleanPrompt.includes(cleanText.slice(0, 15));
+          });
+          // If not found after lastAssignedTurn, check all turns
+          if (!matched) {
+            matched = tokenStats.allTurns.find(t => {
+              if (!t.cleanPrompt) return false;
+              const needle = t.cleanPrompt.slice(0, 15);
+              return cleanText.includes(needle) || t.cleanPrompt.includes(cleanText.slice(0, 15));
+            });
+          }
+        }
+      }
+
+      let turnNum;
+      if (matched) {
+        turnNum = matched.turnIndex;
+        lastAssignedTurn = Math.max(lastAssignedTurn, turnNum);
+      } else {
+        turnNum = lastAssignedTurn > 0 ? (lastAssignedTurn + 1) : (userNodes.length > 1 ? (idx + 1) : (tokenStats.totalTurns || 1));
+        lastAssignedTurn = Math.max(lastAssignedTurn, turnNum);
+      }
+
+      const turnEngKey = (matched && matched.engineKey) ? matched.engineKey : activeEngKey;
+      const turnEng = ENGINES[turnEngKey] || activeEng;
+
+      const turnCtx = (matched && matched.contextTokens) ? matched.contextTokens : tokenStats.currentContext;
+      const ctxStr = turnCtx ? `${(turnCtx / 1000).toFixed(0)}k ctx` : '';
+
+      chip.title = `Turn ${turnNum} · ${turnEng.name} · Click to open Turn Shower`;
+      chip.onclick = (e) => {
+        e.stopPropagation();
+        if (window.__agOpenStudioModal) window.__agOpenStudioModal('telemetry');
+      };
+
+      chip.onmouseenter = () => {
+        chip.style.borderColor = 'rgba(255,255,255,0.2)';
+        chip.style.background = 'rgba(255,255,255,0.06)';
+      };
+      chip.onmouseleave = () => {
+        chip.style.borderColor = 'rgba(255,255,255,0.08)';
+        chip.style.background = 'rgba(255,255,255,0.03)';
+      };
+
       chip.innerHTML = `
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;shrink-0;">
           <polyline points="9 18 15 12 9 6"></polyline>
         </svg>
         <span style="color:#e2e8f0;font-weight:600;">Turn ${turnNum}</span>
         <span style="opacity:0.25;">·</span>
-        <span style="color:${activeEng.color};font-weight:500;">${activeEng.name}</span>
-        ${ctxStr ? `<span style="opacity:0.25;">·</span><span style="color:#64748b;">${ctxStr} ctx</span>` : ''}
+        <span style="color:${turnEng.color};font-weight:500;">${turnEng.name}</span>
+        ${ctxStr ? `<span style="opacity:0.25;">·</span><span style="color:#64748b;">${ctxStr}</span>` : ''}
       `;
     });
   };
@@ -1393,6 +1490,7 @@
   window.__agUpdateTokens = function(stats) {
     if (!stats) return;
     tokenStats = Object.assign(tokenStats, stats);
+    window.__agTokenStats = tokenStats;
     window.__agEnsureBottomControls();
     window.__agEnsureChatTurnChips();
     updateModalUI();
