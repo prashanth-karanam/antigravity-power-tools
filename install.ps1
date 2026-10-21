@@ -55,8 +55,19 @@ $vbsPath = "$startupFolder\AntigravityPowerTools.vbs"
 
 $vbsContent = @'
 Set WshShell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+nodePath = "C:\Program Files\nodejs\node.exe"
+If Not fso.FileExists(nodePath) Then
+  nodePath = "node"
+End If
+
 strDaemon = WshShell.ExpandEnvironmentStrings("%USERPROFILE%\.gemini\config\power-tools\power_daemon.js")
-WshShell.Run "node """ & strDaemon & """", 0, False
+If Not fso.FileExists(strDaemon) Then
+  strDaemon = WshShell.ExpandEnvironmentStrings("%USERPROFILE%\.gemini\antigravity\scratch\antigravity-power-tools\bin\power_daemon.js")
+End If
+
+WshShell.Run """" & nodePath & """ """ & strDaemon & """", 0, False
 '@
 
 Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII

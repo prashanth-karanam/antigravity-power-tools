@@ -1,12 +1,14 @@
 Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-strConfigPath = WshShell.ExpandEnvironmentStrings("%USERPROFILE%\.gemini\config\power-tools\power_daemon.js")
-strLocalPath = fso.GetParentFolderName(WScript.ScriptFullName) & "\power_daemon.js"
-
-targetScript = strLocalPath
-If fso.FileExists(strConfigPath) Then
-  targetScript = strConfigPath
+nodePath = "C:\Program Files\nodejs\node.exe"
+If Not fso.FileExists(nodePath) Then
+  nodePath = "node"
 End If
 
-WshShell.Run "node """ & targetScript & """", 0, False
+strDaemon = WshShell.ExpandEnvironmentStrings("%USERPROFILE%\.gemini\config\power-tools\power_daemon.js")
+If Not fso.FileExists(strDaemon) Then
+  strDaemon = fso.GetParentFolderName(WScript.ScriptFullName) & "\power_daemon.js"
+End If
+
+WshShell.Run """" & nodePath & """ """ & strDaemon & """", 0, False
