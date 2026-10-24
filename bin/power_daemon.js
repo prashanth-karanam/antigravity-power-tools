@@ -239,11 +239,21 @@ function log(msg) {
 
 function getCandidatePorts() {
   try {
-    const raw = execSync('powershell -NoProfile -Command "(Get-NetTCPConnection -State Listen | Where-Object { $_.OwningProcess -in (Get-Process Antigravity -ErrorAction SilentlyContinue).Id } | Select-Object -ExpandProperty LocalPort)"').toString();
-    const ports = raw.split(/\r?\n/).map(p => parseInt(p.trim())).filter(p => !isNaN(p));
+    const raw = execSync('cmd /c "netstat -ano -p tcp | findstr LISTENING | findstr 127.0.0.1:"', { timeout: 2000 }).toString();
+    const ports = [];
+    const lines = raw.split(/\r?\n/);
+    for (const line of lines) {
+      const match = line.trim().match(/127\.0\.0\.1:(\d+)/);
+      if (match) {
+        const port = parseInt(match[1], 10);
+        if (port >= 1024 && port !== DAEMON_HTTP_PORT && !ports.includes(port)) {
+          ports.push(port);
+        }
+      }
+    }
     return ports;
   } catch(e) {
-    return [50632, 55968, 62386];
+    return [57163, 60812, 50632, 55968, 62386];
   }
 }
 
@@ -253,7 +263,7 @@ async function findWorkingCdpPort() {
     const ok = await new Promise((res) => {
       const req = http.get(`http://127.0.0.1:${port}/json/version`, { timeout: 400 }, r => {
         let d = ''; r.on('data', c => d += c);
-        r.on('end', () => res(d.includes('webSocketDebuggerUrl')));
+        r.on('end', () => res(d.includes('Antigravity') && d.includes('webSocketDebuggerUrl')));
       });
       req.on('error', () => res(false));
       req.on('timeout', () => { req.destroy(); res(false); });
@@ -271,8 +281,8 @@ async function getPageTarget(port) {
       res.on('end', () => {
         try {
           const list = JSON.parse(data);
-          const page = list.find(t => t.type === 'page' && t.webSocketDebuggerUrl);
-          resolve(page || null);
+          const page = list.find(t => t.type === 'page' && t.webSocketDebuggerUrl && (t.title.includes('Antigravity') || t.url.includes('/c/')));
+          resolve(page || list.find(t => t.type === 'page' && t.webSocketDebuggerUrl) || null);
         } catch (e) {
           resolve(null);
         }
@@ -658,13 +668,12 @@ let activeClient = null;
 async function lifecycleLoop() {
   while (true) {
     try {
-      const port = await findWorkingCdpPort();
-      if (!port) {
-        await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-
       if (!activeClient || !activeClient.isAlive) {
+        const port = await findWorkingCdpPort();
+        if (!port) {
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
         const page = await getPageTarget(port);
         if (page && page.webSocketDebuggerUrl) {
           log(`Attaching to Antigravity Electron page on port ${port}...`);

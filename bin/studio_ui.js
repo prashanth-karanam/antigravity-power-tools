@@ -1401,19 +1401,38 @@
   }
 
   window.__agEnsureChatTurnChips = function() {
-    const userNodes = document.querySelectorAll('[data-testid="user-input-step"], [data-testid*="user-message"], .user-message');
+    // 1. Purge any chips that got accidentally placed inside bg-card-border
+    document.querySelectorAll('.bg-card-border .ag-turn-chip').forEach(c => c.remove());
+
+    // 2. Select ONLY top-level user-input-step containers (never nested children)
+    let userNodes = Array.from(document.querySelectorAll('[data-testid="user-input-step"]'));
+    if (userNodes.length === 0) {
+      userNodes = Array.from(document.querySelectorAll('[data-testid*="user-message"], .user-message'));
+    }
+    userNodes = userNodes.filter(node => !userNodes.some(other => other !== node && other.contains(node)));
+
     const activeEngKey = getActiveEngineForCurrentChat();
     const activeEng = ENGINES[activeEngKey] || ENGINES['stock_architect'];
 
     let lastAssignedTurn = 0;
 
     userNodes.forEach((node, idx) => {
-      let chip = node.querySelector('.ag-turn-chip');
+      // Ensure strictly only 1 chip in node
+      const allChips = Array.from(node.querySelectorAll('.ag-turn-chip'));
+      for (let k = 1; k < allChips.length; k++) {
+        allChips[k].remove();
+      }
+
+      let chip = allChips[0] || null;
+      const cardBorder = node.querySelector('.bg-card-border');
       if (!chip) {
         chip = document.createElement('div');
         chip.className = 'ag-turn-chip';
-        const cardBorder = node.querySelector('.bg-card-border') || node;
-        cardBorder.parentNode.insertBefore(chip, cardBorder.nextSibling);
+        if (cardBorder && cardBorder.parentNode) {
+          cardBorder.parentNode.insertBefore(chip, cardBorder.nextSibling);
+        } else {
+          node.appendChild(chip);
+        }
       }
       chip.style.cssText = `display:inline-flex;align-items:center;gap:6px;font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.03);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);margin-top:6px;margin-bottom:2px;width:fit-content;line-height:14px;letter-spacing:0.1px;user-select:none;cursor:pointer;transition:border-color 0.15s, background 0.15s;`;
       
